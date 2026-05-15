@@ -4,7 +4,8 @@ const fs = require('fs');
 
 const DISCORD_WEBHOOK = 'https://discord.com/api/webhooks/1504857329190048006/VKZEEClNQkY75JLhBYc91V5fr8buY5A-O8fgnJFtDVnHVwCc9Fro54FI9ZJrGSpssVh2';
 
-export const config = {
+// Настройка для Vercel
+module.exports.config = {
   api: {
     bodyParser: false,
   },
@@ -69,10 +70,10 @@ function uploadFileToDiscord(filePath, filename) {
             if (json.attachments && json.attachments[0]) {
               resolve({ fileUrl: json.attachments[0].url, originalName: filename });
             } else {
-              reject(new Error('Discord upload failed: ' + responseData));
+              reject(new Error('Discord upload failed'));
             }
           } catch (e) {
-            reject(new Error('Invalid Discord response: ' + responseData));
+            reject(new Error('Invalid Discord response'));
           }
         });
       });
@@ -85,7 +86,8 @@ function uploadFileToDiscord(filePath, filename) {
   });
 }
 
-export default async function handler(req, res) {
+// Главный обработчик (CommonJS формат)
+module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -98,31 +100,32 @@ export default async function handler(req, res) {
   return new Promise((resolve) => {
     form.parse(req, async (err, fields, files) => {
       if (err) {
-        res.status(500).json({ success: false, error: 'Form parsing error: ' + err.message });
+        res.status(500).json({ success: false, error: 'Form error: ' + err.message });
         return resolve();
       }
 
       const fileEntries = [];
-      // Handle single or multiple files
-      if (Array.isArray(files.fileToUpload)) {
-        fileEntries.push(...files.fileToUpload);
-      } else if (files.fileToUpload) {
-        fileEntries.push(files.fileToUpload);
+      const uploadedFiles = files.fileToUpload;
+      if (Array.isArray(uploadedFiles)) {
+        fileEntries.push(...uploadedFiles);
+      } else if (uploadedFiles) {
+        fileEntries.push(uploadedFiles);
       }
 
       if (fileEntries.length === 0) {
-        res.status(400).json({ success: false, error: 'No files provided' });
+        res.status(400).json({ success: false, error: 'No files uploaded' });
         return resolve();
       }
 
       try {
         const uploadResults = [];
         for (const file of fileEntries) {
-          const result = await uploadFileToDiscord(file.filepath, file.originalFilename);
+          const path = file.filepath || file.path;
+          const name = file.originalFilename || file.name;
+          const result = await uploadFileToDiscord(path, name);
           uploadResults.push(result);
         }
 
-        // Команда для PowerShell
         let combinedCmd = '';
         if (uploadResults.length === 1) {
           const r = uploadResults[0];
@@ -145,9 +148,9 @@ export default async function handler(req, res) {
         res.status(200).json({ success: true, files: uploadResults, command: combinedCmd });
         resolve();
       } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: 'Process error: ' + error.message });
         resolve();
       }
     });
   });
-}
+};
