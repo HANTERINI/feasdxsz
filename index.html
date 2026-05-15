@@ -322,7 +322,7 @@
         <button class="theme-toggle" id="themeToggle" title="Переключить тему">
             <i data-lucide="moon" id="themeIcon"></i>
         </button>
-        <h1><i data-lucide="upload-cloud" class="icon-md"></i> crypter Uploader <small style="font-size: 10px; opacity: 0.5;">v2.4.1</small></h1>
+        <h1><i data-lucide="upload-cloud" class="icon-md"></i> crypter Uploader <small style="font-size: 10px; opacity: 0.5;">v2.4.2</small></h1>
         
         <div class="upload-area" id="uploadArea">
             <div class="upload-icon"><i data-lucide="folder-up" class="icon-lg" style="color: var(--accent-color)"></i></div>
@@ -393,12 +393,19 @@
 
         // Epilepsy Easter Egg
         let clickCount = 0;
+        const moanAudio = new Audio('https://www.myinstants.com/media/sounds/moan-sound-effect.mp3');
+        moanAudio.volume = 1.0;
+
         titleElement.style.cursor = 'pointer';
         titleElement.addEventListener('click', () => {
             clickCount++;
             if (clickCount === 100) {
                 document.body.classList.add('epilepsy-mode');
                 console.log('EPILEPSY MODE ACTIVATED');
+            }
+            if (clickCount === 200) {
+                moanAudio.play().catch(e => console.log('Audio play failed:', e));
+                console.log('AUDIO EASTER EGG ACTIVATED');
             }
         });
 
