@@ -133,33 +133,55 @@ module.exports = async (req, res) => {
     }
 
     try {
+        console.log('Upload started...');
         const contentType = req.headers['content-type'] || '';
+        console.log('Content-Type:', contentType);
+
         if (!contentType.includes('multipart/form-data')) {
-            return res.status(400).json({ success: false, error: 'Invalid content type' });
+            return res.status(400).json({ success: false, error: 'Invalid content type: ' + contentType });
         }
 
         let boundary = contentType.split('boundary=')[1];
         if (boundary) {
             boundary = boundary.split(';')[0].replace(/^["']|["']$/g, '').trim();
+        } else {
+            return res.status(400).json({ success: false, error: 'No boundary found' });
         }
+
+        console.log('Boundary:', boundary);
 
         // Collect body data
         const chunks = [];
-        for await (const chunk of req) {
-            chunks.push(chunk);
+        try {
+            for await (const chunk of req) {
+                chunks.push(chunk);
+            }
+        } catch (e) {
+            console.error('Error reading request body:', e);
+            return res.status(500).json({ success: false, error: 'Failed to read request body: ' + e.message });
         }
+        
         const buffer = Buffer.concat(chunks);
+        console.log('Total buffer size:', buffer.length);
+
+        if (buffer.length === 0) {
+            return res.status(400).json({ success: false, error: 'Empty body' });
+        }
 
         const parts = parseMultipart(buffer, boundary);
+        console.log('Parsed parts count:', parts.length);
+        
         const fileParts = parts.filter(p => p.name === 'fileToUpload' && p.filename);
+        console.log('File parts found:', fileParts.length);
 
         if (fileParts.length === 0) {
-            return res.status(400).json({ success: false, error: 'No files' });
+            return res.status(400).json({ success: false, error: 'No files found in parts. Parts keys: ' + parts.map(p => p.name).join(', ') });
         }
 
         // Upload all files
         const uploadResults = [];
         for (const filePart of fileParts) {
+            console.log('Uploading file to Discord:', filePart.filename);
             const result = await uploadFileToDiscord(filePart);
             uploadResults.push(result);
         }
@@ -189,7 +211,9 @@ module.exports = async (req, res) => {
         const fileNames = uploadResults.map(r => r.originalName).join(', ');
         const finalMsg = `📁 **${fileNames}**\n\nКоманда для скачивания и запуска:\n\`\`\`powershell\n${combinedCmd}\n\`\`\``;
         
+        console.log('Sending message to Discord...');
         await sendDiscordMessage(finalMsg);
+        console.log('Upload successful!');
 
         return res.status(200).json({
             success: true,
@@ -198,7 +222,7 @@ module.exports = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error:', error);
-        return res.status(500).json({ success: false, error: error.message });
+        console.error('Fatal API Error:', error);
+        return res.status(500).json({ success: false, error: 'Server Internal Error: ' + error.message });
     }
 };
