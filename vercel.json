@@ -1,0 +1,8 @@
+{
+  "version": 2,
+  "public": true,
+  "rewrites": [
+    { "source": "/api/upload", "destination": "/api/upload.js" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
