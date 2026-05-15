@@ -7,6 +7,6 @@
     "start": "node discord-encoded-server.js"
   },
   "dependencies": {
-    "busboy": "^1.6.0"
+    "formidable": "^3.5.1"
   }
 }
