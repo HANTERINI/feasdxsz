@@ -1,0 +1,9 @@
+node_modules
+temp_uploads
+discord-encoded-server.js
+discord-server.js
+server.js
+server.py
+uploader.py
+*.bat
+*.exe

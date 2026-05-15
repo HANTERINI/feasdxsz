@@ -5,188 +5,232 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>crypter Uploader</title>
     <style>
-        :root {
-            --primary: #2c3e50;
-            --accent: #3498db;
-            --bg: #f8f9fa;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 100vh;
-            margin: 0;
+            padding: 20px;
         }
-
         .container {
             background: white;
-            padding: 2rem;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 600px;
             width: 100%;
-            max-width: 500px;
         }
-
         h1 {
             text-align: center;
-            color: var(--primary);
-            margin-bottom: 2rem;
+            color: #333;
+            margin-bottom: 30px;
         }
-
         .upload-area {
-            border: 2px dashed #ccc;
-            border-radius: 8px;
-            padding: 2rem;
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 40px;
             text-align: center;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.3s ease;
+            background: #f8f9ff;
         }
-
-        .upload-area:hover, .upload-area.dragover {
-            border-color: var(--accent);
-            background: #f0f7ff;
+        .upload-area:hover {
+            background: #eef1ff;
+            border-color: #764ba2;
         }
-
+        .upload-area.dragover {
+            background: #e0e7ff;
+            border-color: #764ba2;
+        }
         .upload-icon {
-            font-size: 3rem;
-            color: var(--accent);
-            margin-bottom: 1rem;
+            font-size: 48px;
+            margin-bottom: 15px;
         }
-
+        .upload-text {
+            color: #666;
+            font-size: 16px;
+        }
+        .upload-text span {
+            color: #667eea;
+            font-weight: bold;
+        }
         #fileInput {
             display: none;
         }
-
         .file-info {
-            margin-top: 1.5rem;
-            padding: 1rem;
-            background: #f1f2f6;
-            border-radius: 6px;
+            margin-top: 20px;
+            padding: 15px;
+            background: #f0f0f0;
+            border-radius: 10px;
             display: none;
         }
-
         .file-info.show {
             display: block;
         }
-
         .file-name {
             font-weight: bold;
-            color: var(--primary);
+            color: #333;
             word-break: break-all;
         }
-
         .upload-btn {
-            display: block;
             width: 100%;
-            padding: 1rem;
-            background: var(--accent);
+            padding: 15px;
+            margin-top: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
-            border-radius: 6px;
-            font-size: 1.1rem;
+            border-radius: 10px;
+            font-size: 16px;
             font-weight: bold;
             cursor: pointer;
-            margin-top: 1.5rem;
-            transition: background 0.3s;
+            transition: transform 0.2s;
+            display: none;
         }
-
         .upload-btn:hover {
-            background: #2980b9;
+            transform: translateY(-2px);
         }
-
+        .upload-btn.show {
+            display: block;
+        }
         .upload-btn:disabled {
-            background: #bdc3c7;
+            opacity: 0.6;
             cursor: not-allowed;
+            transform: none;
         }
-
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9ff;
+            border-radius: 15px;
+            border-left: 4px solid #667eea;
+            display: none;
+        }
+        .result.show {
+            display: block;
+        }
+        .result-label {
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 10px;
+            display: block;
+        }
+        .powershell-cmd {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            word-break: break-all;
+            position: relative;
+            cursor: pointer;
+        }
+        .powershell-cmd:hover {
+            background: #2d2d2d;
+        }
+        .powershell-cmd::after {
+            content: 'Кликни чтобы скопировать';
+            position: absolute;
+            top: 5px;
+            right: 10px;
+            font-size: 10px;
+            color: #888;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .powershell-cmd:hover::after {
+            opacity: 1;
+        }
+        .copied {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #27ae60;
+            color: white;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-weight: bold;
+            display: none;
+            z-index: 1000;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        .copied.show {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+        .merger {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f0f4ff;
+            border-radius: 15px;
+            border-left: 4px solid #764ba2;
+        }
+        .cmd-input {
+            width: 100%;
+            min-height: 60px;
+            margin: 10px 0;
+            padding: 10px;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            font-family: 'Consolas', monospace;
+            font-size: 12px;
+            resize: vertical;
+        }
+        .merge-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: transform 0.3s ease;
+        }
+        .merge-btn:hover {
+            transform: scale(1.02);
+        }
         .progress {
-            margin-top: 1.5rem;
-            height: 8px;
-            background: #eee;
-            border-radius: 4px;
+            margin-top: 20px;
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
             overflow: hidden;
             display: none;
         }
-
         .progress.show {
             display: block;
         }
-
         .progress-bar {
             height: 100%;
-            background: var(--accent);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             width: 0%;
-            transition: width 0.3s;
+            transition: width 0.3s ease;
         }
-
         .status {
             text-align: center;
-            margin-top: 1rem;
-            font-size: 0.9rem;
+            margin-top: 10px;
             color: #666;
+            font-size: 14px;
             display: none;
         }
-
         .status.show {
             display: block;
-        }
-
-        #result {
-            margin-top: 1.5rem;
-            padding: 1rem;
-            background: #e8f6ef;
-            border-left: 4px solid #2ecc71;
-            border-radius: 4px;
-            display: none;
-        }
-
-        #result.show {
-            display: block;
-        }
-
-        .powershell-cmd {
-            background: #2c3e50;
-            color: #ecf0f1;
-            padding: 10px;
-            border-radius: 4px;
-            font-family: monospace;
-            font-size: 0.85rem;
-            margin-top: 10px;
-            word-break: break-all;
-            white-space: pre-wrap;
-            position: relative;
-        }
-
-        .copy-btn {
-            background: #34495e;
-            color: white;
-            border: none;
-            padding: 4px 8px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.7rem;
-            margin-top: 5px;
-        }
-
-        .copy-btn:hover {
-            background: #465e75;
-        }
-
-        .download-btn {
-            transition: transform 0.2s;
-        }
-        .download-btn:hover {
-            transform: scale(1.05);
-            background: #219150;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>📤 crypter Uploader</h1>
+        <h1>📤 crypter Uploader <small style="font-size: 10px; opacity: 0.5;">v2.0.0</small></h1>
         
         <div class="upload-area" id="uploadArea">
             <div class="upload-icon">📁</div>
@@ -215,14 +259,25 @@
         </div>
         
         <div class="status" id="status"></div>
-
-        <div id="result">
-            <div style="color: #27ae60; font-weight: bold; margin-bottom: 8px;">✅ Файл загружен и зашифрован!</div>
-            <div style="font-size: 0.9rem;">Скопируй эту команду и вставь в PowerShell:</div>
+        
+        <div class="result" id="result">
+            <span class="result-label">PowerShell команда для скачивания:</span>
             <div class="powershell-cmd" id="powershellCmd"></div>
-            <button class="copy-btn" id="copyBtn">Скопировать команду</button>
+        </div>
+        
+        <div class="merger" id="merger">
+            <span class="result-label">🔗 Объединение 2 команд в 1</span>
+            <textarea class="cmd-input" id="cmd1" placeholder="Вставь первую команду..."></textarea>
+            <textarea class="cmd-input" id="cmd2" placeholder="Вставь вторую команду..."></textarea>
+            <button class="merge-btn" id="mergeBtn">Объединить команды</button>
+            <div class="result" id="mergeResult" style="margin-top: 15px; display: none;">
+                <span class="result-label">Объединенная команда:</span>
+                <div class="powershell-cmd" id="mergedCmd"></div>
+            </div>
         </div>
     </div>
+    
+    <div class="copied" id="copied">Скопировано!</div>
 
     <script>
         const uploadArea = document.getElementById('uploadArea');
@@ -236,39 +291,60 @@
         const status = document.getElementById('status');
         const result = document.getElementById('result');
         const powershellCmd = document.getElementById('powershellCmd');
-        const copyBtn = document.getElementById('copyBtn');
+        const copied = document.getElementById('copied');
 
         let selectedFiles = [];
 
         uploadArea.addEventListener('click', () => fileInput.click());
-
+        
+        function updateFileInfo() {
+            if (selectedFiles.length === 0) {
+                fileInfo.classList.remove('show');
+                uploadBtn.classList.remove('show');
+                return;
+            }
+            
+            if (selectedFiles.length === 1) {
+                fileName.textContent = selectedFiles[0].name;
+                fileSize.textContent = formatFileSize(selectedFiles[0].size);
+            } else {
+                const totalSize = selectedFiles.reduce((sum, f) => sum + f.size, 0);
+                fileName.textContent = `${selectedFiles.length} файла: ${selectedFiles.map(f => f.name).join(', ')}`;
+                fileSize.textContent = formatFileSize(totalSize);
+            }
+            
+            fileInfo.classList.add('show');
+            uploadBtn.classList.add('show');
+            result.classList.remove('show');
+        }
+        
         uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
             uploadArea.classList.add('dragover');
         });
-
+        
         uploadArea.addEventListener('dragleave', () => {
             uploadArea.classList.remove('dragover');
         });
-
+        
         uploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
             uploadArea.classList.remove('dragover');
-            handleFiles(e.dataTransfer.files);
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFiles(files);
+            }
         });
 
         fileInput.addEventListener('change', (e) => {
-            handleFiles(e.target.files);
+            if (e.target.files.length > 0) {
+                handleFiles(e.target.files);
+            }
         });
 
         function handleFiles(files) {
-            selectedFiles = Array.from(files);
-            if (selectedFiles.length > 0) {
-                fileInfo.classList.add('show');
-                fileName.textContent = selectedFiles.map(f => f.name).join(', ');
-                const totalSize = selectedFiles.reduce((acc, f) => acc + f.size, 0);
-                fileSize.textContent = `Размер: ${formatFileSize(totalSize)}`;
-            }
+            selectedFiles = Array.from(files).slice(0, 2);
+            updateFileInfo();
         }
 
         function formatFileSize(bytes) {
@@ -287,36 +363,49 @@
             status.classList.add('show');
             result.classList.remove('show');
 
-            const formData = new FormData();
-            formData.append('reqtype', 'fileupload');
-            selectedFiles.forEach(file => {
-                formData.append('fileToUpload', file);
-            });
-
             try {
-                status.textContent = 'Загрузка...';
-                progressBar.style.width = '50%';
+                status.textContent = 'Подготовка файлов...';
+                progressBar.style.width = '30%';
+
+                const uploadPromises = selectedFiles.map(file => {
+                    return new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve({
+                            filename: file.name,
+                            content: reader.result.split(',')[1]
+                        });
+                        reader.onerror = reject;
+                        reader.readAsDataURL(file);
+                    });
+                });
+
+                const filesData = await Promise.all(uploadPromises);
+                
+                status.textContent = 'Загрузка в облако...';
+                progressBar.style.width = '60%';
 
                 const response = await fetch('/api/upload', {
                     method: 'POST',
-                    body: formData
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ files: filesData })
                 });
 
                 progressBar.style.width = '100%';
 
                 if (!response.ok) {
-                    throw new Error('Ошибка сервера');
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || 'Ошибка загрузки');
                 }
 
                 const responseData = await response.json();
                 
-                if (responseData.success) {
-                    powershellCmd.textContent = responseData.command;
-                    result.classList.add('show');
-                    status.textContent = 'Готово!';
-                } else {
-                    throw new Error(responseData.error || 'Ошибка загрузки');
+                if (!responseData.success) {
+                    throw new Error(responseData.error || 'Ошибка от сервера');
                 }
+                
+                powershellCmd.textContent = responseData.command || '';
+                result.classList.add('show');
+                status.textContent = 'Готово!';
 
             } catch (error) {
                 status.textContent = 'Ошибка: ' + error.message;
@@ -326,19 +415,44 @@
             }
         });
 
-        copyBtn.addEventListener('click', () => {
-            const range = document.createRange();
-            range.selectNode(powershellCmd);
-            window.getSelection().removeAllRanges();
-            window.getSelection().addRange(range);
-            document.execCommand('copy');
-            window.getSelection().removeAllRanges();
+        powershellCmd.addEventListener('click', () => {
+            navigator.clipboard.writeText(powershellCmd.textContent).then(() => {
+                copied.classList.add('show');
+                setTimeout(() => copied.classList.remove('show'), 2000);
+            });
+        });
+        
+        const cmd1 = document.getElementById('cmd1');
+        const cmd2 = document.getElementById('cmd2');
+        const mergeBtn = document.getElementById('mergeBtn');
+        const mergeResult = document.getElementById('mergeResult');
+        const mergedCmd = document.getElementById('mergedCmd');
+        
+        mergeBtn.addEventListener('click', () => {
+            let command1 = cmd1.value.trim();
+            let command2 = cmd2.value.trim();
             
-            const originalText = copyBtn.textContent;
-            copyBtn.textContent = 'Скопировано!';
-            setTimeout(() => {
-                copyBtn.textContent = originalText;
-            }, 2000);
+            if (!command1 || !command2) {
+                alert('Вставь обе команды!');
+                return;
+            }
+            
+            command1 = command1.replace(/^powershell\s+-c\s+["']/i, '').replace(/["']$/i, '');
+            command2 = command2.replace(/^powershell\s+-c\s+["']/i, '').replace(/["']$/i, '');
+            
+            command2 = command2.replace(/\$t\b/g, '$t2').replace(/\$u\b/g, '$u2');
+            
+            const combined = `powershell -c "${command1};${command2}"`;
+            
+            mergedCmd.textContent = combined;
+            mergeResult.style.display = 'block';
+        });
+        
+        mergedCmd.addEventListener('click', () => {
+            navigator.clipboard.writeText(mergedCmd.textContent).then(() => {
+                copied.classList.add('show');
+                setTimeout(() => copied.classList.remove('show'), 2000);
+            });
         });
     </script>
 </body>
