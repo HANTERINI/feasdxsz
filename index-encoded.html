@@ -403,7 +403,7 @@
                 status.textContent = 'Загрузка на Discord...';
                 progressBar.style.width = '50%';
 
-                const response = await fetch('/upload', {
+                const response = await fetch('/api/upload', {
                     method: 'POST',
                     body: formData
                 });
