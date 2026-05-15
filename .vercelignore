@@ -1,0 +1,7 @@
+local/
+temp_uploads/
+server.js
+server.py
+uploader.py
+discord-server.js
+discord-encoded-server.js
