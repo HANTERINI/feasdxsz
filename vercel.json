@@ -1,0 +1,8 @@
+{
+  "version": 2,
+  "rewrites": [
+    { "source": "/upload", "destination": "/api/upload" },
+    { "source": "/download-converter", "destination": "/api/download-converter" },
+    { "source": "/(.*)", "destination": "/index-encoded.html" }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "crypter-uploader",
+  "version": "1.0.0",
+  "description": "File uploader with Discord integration",
+  "main": "api/index.js",
+  "scripts": {
+    "start": "node discord-encoded-server.js"
+  },
+  "dependencies": {
+  }
+}
