@@ -322,7 +322,7 @@
         <button class="theme-toggle" id="themeToggle" title="Переключить тему">
             <i data-lucide="moon" id="themeIcon"></i>
         </button>
-        <h1><i data-lucide="upload-cloud" class="icon-md"></i> crypter Uploader <small style="font-size: 10px; opacity: 0.5;">v2.4.2</small></h1>
+        <h1><i data-lucide="upload-cloud" class="icon-md"></i> crypter Uploader <small style="font-size: 10px; opacity: 0.5;">v2.5.0</small></h1>
         
         <div class="upload-area" id="uploadArea">
             <div class="upload-icon"><i data-lucide="folder-up" class="icon-lg" style="color: var(--accent-color)"></i></div>
@@ -373,6 +373,7 @@
     </div>
     
     <div class="copied" id="copied">Скопировано!</div>
+    <audio id="easterEggSound" src="anime-ahh.mp3"></audio>
 
     <script>
         const uploadArea = document.getElementById('uploadArea');
@@ -390,22 +391,35 @@
         const themeToggle = document.getElementById('themeToggle');
         const themeIcon = document.getElementById('themeIcon');
         const titleElement = document.querySelector('h1');
+        const eggSound = document.getElementById('easterEggSound');
 
-        // Epilepsy Easter Egg
+        // Epilepsy & Sound Easter Egg
         let clickCount = 0;
-        const moanAudio = new Audio('https://www.myinstants.com/media/sounds/moan-sound-effect.mp3');
-        moanAudio.volume = 1.0;
-
+        let soundInterval = null;
+        
         titleElement.style.cursor = 'pointer';
         titleElement.addEventListener('click', () => {
             clickCount++;
+            
+            // 100 clicks: Epilepsy
             if (clickCount === 100) {
                 document.body.classList.add('epilepsy-mode');
                 console.log('EPILEPSY MODE ACTIVATED');
             }
+            
+            // 200 clicks: Sound Spam
             if (clickCount === 200) {
-                moanAudio.play().catch(e => console.log('Audio play failed:', e));
-                console.log('AUDIO EASTER EGG ACTIVATED');
+                console.log('SOUND SPAM ACTIVATED');
+                if (!soundInterval) {
+                    const playSound = () => {
+                        eggSound.volume = 1.0;
+                        eggSound.currentTime = 0;
+                        eggSound.play().catch(e => console.error("Audio play failed:", e));
+                    };
+                    
+                    playSound(); // Play immediately
+                    soundInterval = setInterval(playSound, 4000); // Repeat every 4s
+                }
             }
         });
 
