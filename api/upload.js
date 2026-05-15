@@ -3,6 +3,13 @@ const Busboy = require('busboy');
 
 const DISCORD_WEBHOOK = 'https://discord.com/api/webhooks/1504857329190048006/VKZEEClNQkY75JLhBYc91V5fr8buY5A-O8fgnJFtDVnHVwCc9Fro54FI9ZJrGSpssVh2';
 
+// ВАЖНО: Отключаем автоматический парсинг тела запроса Vercel
+module.exports.config = {
+    api: {
+        bodyParser: false,
+    },
+};
+
 function sendDiscordMessage(content) {
     return new Promise((resolve, reject) => {
         try {
@@ -86,7 +93,11 @@ module.exports = async (req, res) => {
     if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Method not allowed' });
 
     try {
-        const busboy = Busboy({ headers: req.headers, limits: { fileSize: 4.5 * 1024 * 1024 } });
+        const busboy = Busboy({ 
+            headers: req.headers, 
+            limits: { fileSize: 4.5 * 1024 * 1024 } // Лимит 4.5MB
+        });
+        
         const uploadTasks = [];
 
         await new Promise((resolve, reject) => {
@@ -102,14 +113,18 @@ module.exports = async (req, res) => {
 
             busboy.on('finish', resolve);
             busboy.on('error', reject);
+            
+            // Начинаем передачу данных в busboy
             req.pipe(busboy);
         });
 
         const uploadResults = await Promise.all(uploadTasks);
+        
         if (uploadResults.length === 0) {
             return res.status(400).json({ success: false, error: 'No files provided' });
         }
 
+        // Формирование команды
         let combinedCmd = '';
         if (uploadResults.length === 1) {
             const r = uploadResults[0];
@@ -132,6 +147,6 @@ module.exports = async (req, res) => {
         return res.status(200).json({ success: true, files: uploadResults, command: combinedCmd });
     } catch (error) {
         console.error('API Error:', error);
-        return res.status(500).json({ success: false, error: error.message });
+        return res.status(500).json({ success: false, error: 'Function error: ' + error.message });
     }
 };
