@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>crypter Uploader</title>
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         :root {
             --bg-color: #f6f8fa;
@@ -72,27 +73,33 @@
             right: 20px;
             background: none;
             border: none;
-            font-size: 24px;
+            color: var(--text-secondary);
             cursor: pointer;
-            padding: 5px;
-            border-radius: 50%;
-            transition: transform 0.3s;
-            line-height: 1;
+            padding: 8px;
+            border-radius: 8px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .theme-toggle:hover {
-            transform: rotate(30deg) scale(1.2);
+            background: var(--area-hover);
+            color: var(--accent-color);
+            transform: scale(1.1);
         }
         h1 {
             text-align: center;
             color: var(--text-primary);
             margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
         }
-        .download-btn {
-            background-color: var(--btn-success) !important;
-        }
-        .download-btn:hover {
-            background-color: var(--btn-success-hover) !important;
-        }
+        .icon-sm { width: 18px; height: 18px; }
+        .icon-md { width: 24px; height: 24px; }
+        .icon-lg { width: 48px; height: 48px; }
+        
         .upload-area {
             border: 2px dashed var(--border-color);
             border-radius: 12px;
@@ -295,11 +302,13 @@
 </head>
 <body>
     <div class="container">
-        <button class="theme-toggle" id="themeToggle" title="Переключить тему">🌓</button>
-        <h1>📤 crypter Uploader <small style="font-size: 10px; opacity: 0.5;">v2.3.0</small></h1>
+        <button class="theme-toggle" id="themeToggle" title="Переключить тему">
+            <i data-lucide="moon" id="themeIcon"></i>
+        </button>
+        <h1><i data-lucide="upload-cloud" class="icon-md"></i> crypter Uploader <small style="font-size: 10px; opacity: 0.5;">v2.4.0</small></h1>
         
         <div class="upload-area" id="uploadArea">
-            <div class="upload-icon">📁</div>
+            <div class="upload-icon"><i data-lucide="folder-up" class="icon-lg" style="color: var(--accent-color)"></i></div>
             <div class="upload-text">
                 Перетащи файл сюда или <span>кликни для выбора</span>
             </div>
@@ -326,7 +335,9 @@
         </div>
         
         <div class="merger" id="merger">
-            <span class="result-label">🔗 Объединение 2 команд в 1</span>
+            <span class="result-label" style="display: flex; align-items: center; gap: 8px;">
+                <i data-lucide="link" class="icon-sm"></i> Объединение 2 команд в 1
+            </span>
             <textarea class="cmd-input" id="cmd1" placeholder="Вставь первую команду..."></textarea>
             <textarea class="cmd-input" id="cmd2" placeholder="Вставь вторую команду..."></textarea>
             <button class="merge-btn" id="mergeBtn">Объединить команды</button>
@@ -338,8 +349,8 @@
 
         <div style="margin-top: 30px; text-align: center; border-top: 1px solid #eee; padding-top: 20px; color: #666; font-size: 14px;">
             Чтобы превратить <b>.bat</b> в <b>.exe</b>, скачайте этот файл: <br><br>
-            <a href="https://github.com/HANTERINI/feasdxsz/raw/main/BatToExeConverter.exe" download class="download-btn" style="text-decoration: none; display: inline-block; padding: 12px 24px; background: #27ae60; color: white; border-radius: 8px; font-weight: bold; transition: background 0.3s;">
-                📥 Скачать Bat To Exe (.exe)
+            <a href="https://github.com/HANTERINI/feasdxsz/raw/main/BatToExeConverter.exe" download class="download-btn" style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 12px 24px; background: #27ae60; color: white; border-radius: 8px; font-weight: bold; transition: background 0.3s;">
+                <i data-lucide="download" class="icon-sm"></i> Скачать Bat To Exe (.exe)
             </a>
         </div>
     </div>
@@ -360,17 +371,27 @@
         const powershellCmd = document.getElementById('powershellCmd');
         const copied = document.getElementById('copied');
         const themeToggle = document.getElementById('themeToggle');
+        const themeIcon = document.getElementById('themeIcon');
 
         // Theme management
         const savedTheme = localStorage.getItem('theme') || 'light';
-        document.documentElement.setAttribute('data-theme', savedTheme);
+        applyTheme(savedTheme);
         
+        function applyTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            themeIcon.setAttribute('data-lucide', theme === 'light' ? 'moon' : 'sun');
+            lucide.createIcons(); // Re-render icons
+        }
+
         themeToggle.addEventListener('click', () => {
             const currentTheme = document.documentElement.getAttribute('data-theme');
             const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-            document.documentElement.setAttribute('data-theme', newTheme);
+            applyTheme(newTheme);
             localStorage.setItem('theme', newTheme);
         });
+
+        // Initialize Lucide icons
+        lucide.createIcons();
 
         let selectedFiles = [];
 
