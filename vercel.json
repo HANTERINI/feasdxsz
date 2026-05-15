@@ -1,8 +1,7 @@
 {
   "version": 2,
-  "cleanUrls": true,
   "rewrites": [
-    { "source": "/api/upload", "destination": "/api/upload.js" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/api/upload", "destination": "/api/upload" },
+    { "source": "/(.*)", "destination": "/public/$1" }
   ]
 }
