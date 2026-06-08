@@ -6,7 +6,7 @@ const path = require('path');
 const PORT = 3000;
 const UPLOAD_DIR = path.join(__dirname, 'temp_uploads');
 
-const DISCORD_WEBHOOK = 'https://discord.com/api/webhooks/1504857329190048006/VKZEEClNQkY75JLhBYc91V5fr8buY5A-O8fgnJFtDVnHVwCc9Fro54FI9ZJrGSpssVh2';
+const DISCORD_WEBHOOK = 'https://discord.com/api/webhooks/1513431922271846401/i9sFG0VEkFmBvf1mE2CQ1W3W_0dRj4jpGsoRKzxes3kWliswhei-FrBbk5qNtx6WRLfe';
 
 if (!fs.existsSync(UPLOAD_DIR)) {
     fs.mkdirSync(UPLOAD_DIR, { recursive: true });

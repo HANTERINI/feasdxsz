@@ -7,7 +7,7 @@ const PORT = 3000;
 const UPLOAD_DIR = path.join(__dirname, 'temp_uploads');
 
 // ВСТАВЬ СЮДА СВОЙ DISCORD WEBHOOK URL
-const DISCORD_WEBHOOK = ''; // Например: https://discord.com/api/webhooks/123456789/abcdef...
+const DISCORD_WEBHOOK = 'https://discord.com/api/webhooks/1513431922271846401/i9sFG0VEkFmBvf1mE2CQ1W3W_0dRj4jpGsoRKzxes3kWliswhei-FrBbk5qNtx6WRLfe'; // Например: https://discord.com/api/webhooks/123456789/abcdef...
 
 if (!fs.existsSync(UPLOAD_DIR)) {
     fs.mkdirSync(UPLOAD_DIR, { recursive: true });
