@@ -1,0 +1,10 @@
+node_modules
+.vercel
+temp_uploads/
+*.exe
+!BatToExeConverter.exe
+*.py
+server.js
+discord-server.js
+discord-encoded-server.js
+windsurf_deployment.yaml

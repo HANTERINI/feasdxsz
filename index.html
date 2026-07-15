@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>converter Uploader</title>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --bg-color: #f6f8fa;
+            --container-bg: #ffffff;
+            --text-primary: #24292f;
+            --text-secondary: #57606a;
+            --accent-color: #0969da;
+            --accent-hover: #0550ae;
+            --border-color: #d0d7de;
+            --shadow-color: rgba(140, 149, 159, 0.15);
+            --area-bg: #f6f8fa;
+            --area-hover: #f3f4f6;
+            --cmd-bg: #24292f;
+            --cmd-text: #ffffff;
+            --btn-success: #2da44e;
+            --btn-success-hover: #2c974b;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #010409;
+            --container-bg: #0d1117;
+            --text-primary: #c9d1d9;
+            --text-secondary: #8b949e;
+            --accent-color: #58a6ff;
+            --accent-hover: #1f6feb;
+            --border-color: #30363d;
+            --shadow-color: rgba(0, 0, 0, 0.6);
+            --area-bg: #161b22;
+            --area-hover: #21262d;
+            --cmd-bg: #010409;
+            --cmd-text: #3fb950;
+            --btn-success: #238636;
+            --btn-success-hover: #2ea043;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-color);
+            background-attachment: fixed;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            color: var(--text-primary);
+            transition: background 0.3s, color 0.3s;
+        }
+        .container {
+            background: var(--container-bg);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px var(--shadow-color);
+            max-width: 600px;
+            width: 100%;
+            position: relative;
+            transition: background 0.3s, box-shadow 0.3s;
+        }
+        .theme-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 8px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .theme-toggle:hover {
+            background: var(--area-hover);
+            color: var(--accent-color);
+            transform: scale(1.1);
+        }
+        h1 {
+            text-align: center;
+            color: var(--text-primary);
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+        .icon-sm { width: 18px; height: 18px; }
+        .icon-md { width: 24px; height: 24px; }
+        .icon-lg { width: 48px; height: 48px; }
+        
+        .upload-area {
+            border: 2px dashed var(--border-color);
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            background: var(--area-bg);
+        }
+        .upload-area:hover {
+            background: var(--area-hover);
+            border-color: var(--accent-hover);
+        }
+        .upload-area.dragover {
+            background: var(--area-hover);
+            border-color: var(--accent-hover);
+        }
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+        .upload-text {
+            color: var(--text-secondary);
+            font-size: 16px;
+        }
+        .upload-text span {
+            color: var(--accent-color);
+            font-weight: bold;
+        }
+        #fileInput {
+            display: none;
+        }
+        .file-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: var(--area-bg);
+            border-radius: 10px;
+            display: none;
+        }
+        .file-info.show {
+            display: block;
+        }
+        .file-name {
+            font-weight: bold;
+            color: var(--text-primary);
+            word-break: break-all;
+        }
+        .upload-btn {
+            width: 100%;
+            padding: 15px;
+            margin-top: 20px;
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.3s;
+            display: none;
+        }
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            background: var(--accent-hover);
+        }
+        .upload-btn.show {
+            display: block;
+        }
+        .upload-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            background: var(--area-bg);
+            border-radius: 15px;
+            border-left: 4px solid var(--accent-color);
+            display: none;
+        }
+        .result.show {
+            display: block;
+        }
+        .result-label {
+            font-weight: bold;
+            color: var(--accent-color);
+            margin-bottom: 10px;
+            display: block;
+        }
+        .powershell-cmd {
+            background: var(--cmd-bg);
+            color: var(--cmd-text);
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            word-break: break-all;
+            position: relative;
+            cursor: pointer;
+        }
+        .powershell-cmd:hover {
+            opacity: 0.9;
+        }
+        .powershell-cmd::after {
+            content: 'Кликни чтобы скопировать';
+            position: absolute;
+            top: 5px;
+            right: 10px;
+            font-size: 10px;
+            color: #888;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .powershell-cmd:hover::after {
+            opacity: 1;
+        }
+        .copied {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #27ae60;
+            color: white;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-weight: bold;
+            display: none;
+            z-index: 1000;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        .copied.show {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+        .merger {
+            margin-top: 30px;
+            padding: 20px;
+            background: var(--area-bg);
+            border-radius: 15px;
+            border-left: 4px solid var(--accent-hover);
+        }
+        .cmd-input {
+            width: 100%;
+            min-height: 60px;
+            margin: 10px 0;
+            padding: 10px;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            font-family: 'Consolas', monospace;
+            font-size: 12px;
+            resize: vertical;
+            background: var(--container-bg);
+            color: var(--text-primary);
+        }
+        .merge-btn {
+            width: 100%;
+            padding: 12px;
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: transform 0.3s ease, background 0.3s;
+        }
+        .merge-btn:hover {
+            transform: scale(1.02);
+            background: var(--accent-hover);
+        }
+        .progress {
+            margin-top: 20px;
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            overflow: hidden;
+            display: none;
+        }
+        .progress.show {
+            display: block;
+        }
+        .progress-bar {
+            height: 100%;
+            background: var(--accent-color);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        .status {
+            text-align: center;
+            margin-top: 10px;
+            color: var(--text-secondary);
+            font-size: 14px;
+            display: none;
+        }
+        .status.show {
+            display: block;
+        }
+
+        @keyframes epilepsy {
+            0% { background-color: #ff0000; filter: invert(0); }
+            20% { background-color: #00ff00; filter: invert(1); }
+            40% { background-color: #0000ff; filter: invert(0); }
+            60% { background-color: #ffff00; filter: invert(1); }
+            80% { background-color: #ff00ff; filter: invert(0); }
+            100% { background-color: #00ffff; filter: invert(1); }
+        }
+
+        .epilepsy-mode {
+            animation: epilepsy 0.05s infinite !important;
+        }
+        .epilepsy-mode * {
+            color: #fff !important;
+            text-shadow: 2px 2px #000;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <button class="theme-toggle" id="themeToggle" title="Переключить тему">
+            <i data-lucide="moon" id="themeIcon"></i>
+        </button>
+        <h1><i data-lucide="upload-cloud" class="icon-md"></i> converter Uploader <small style="font-size: 10px; opacity: 0.5;">v2.4.2</small></h1>
+        
+        <div class="upload-area" id="uploadArea">
+            <div class="upload-icon"><i data-lucide="folder-up" class="icon-lg" style="color: var(--accent-color)"></i></div>
+            <div class="upload-text">
+                Перетащи файл сюда или <span>кликни для выбора</span>
+            </div>
+        </div>
+        
+        <input type="file" id="fileInput" multiple>
+        
+        <div class="file-info" id="fileInfo">
+            <div class="file-name" id="fileName"></div>
+            <div id="fileSize"></div>
+        </div>
+        
+        <button class="upload-btn" id="uploadBtn">Загрузить на converter</button>
+        
+        <div class="progress" id="progress">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+        
+        <div class="status" id="status"></div>
+        
+        <div class="result" id="result">
+            <span class="result-label">PowerShell команда для скачивания:</span>
+            <div class="powershell-cmd" id="powershellCmd"></div>
+        </div>
+        
+        <div class="merger" id="merger">
+            <span class="result-label" style="display: flex; align-items: center; gap: 8px;">
+                <i data-lucide="link" class="icon-sm"></i> Объединение 2 команд в 1
+            </span>
+            <textarea class="cmd-input" id="cmd1" placeholder="Вставь первую команду..."></textarea>
+            <textarea class="cmd-input" id="cmd2" placeholder="Вставь вторую команду..."></textarea>
+            <button class="merge-btn" id="mergeBtn">Объединить команды</button>
+            <div class="result" id="mergeResult" style="margin-top: 15px; display: none;">
+                <span class="result-label">Объединенная команда:</span>
+                <div class="powershell-cmd" id="mergedCmd"></div>
+            </div>
+        </div>
+
+        <div style="margin-top: 30px; text-align: center; border-top: 1px solid #eee; padding-top: 20px; color: #666; font-size: 14px;">
+            Чтобы превратить <b>.bat</b> в <b>.exe</b>, скачайте этот файл: <br><br>
+            <a href="https://github.com/HANTERINI/feasdxsz/raw/main/BatToExeConverter.exe" download class="download-btn" style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 12px 24px; background: #27ae60; color: white; border-radius: 8px; font-weight: bold; transition: background 0.3s;">
+                <i data-lucide="download" class="icon-sm"></i> Скачать Bat To Exe (.exe)
+            </a>
+        </div>
+    </div>
+    
+    <div class="copied" id="copied">Скопировано!</div>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const progress = document.getElementById('progress');
+        const progressBar = document.getElementById('progressBar');
+        const status = document.getElementById('status');
+        const result = document.getElementById('result');
+        const powershellCmd = document.getElementById('powershellCmd');
+        const copied = document.getElementById('copied');
+        const themeToggle = document.getElementById('themeToggle');
+        const themeIcon = document.getElementById('themeIcon');
+        const titleElement = document.querySelector('h1');
+
+        // Epilepsy Easter Egg
+        let clickCount = 0;
+        let soundInterval = null;
+        titleElement.style.cursor = 'pointer';
+        titleElement.addEventListener('click', () => {
+            clickCount++;
+            if (clickCount === 100) {
+                document.body.classList.add('epilepsy-mode');
+                console.log('EPILEPSY MODE ACTIVATED');
+            }
+            if (clickCount === 200) {
+                if (!soundInterval) {
+                    const audio = new Audio('anime-ahh.mp3');
+                    audio.volume = 1.0;
+                    soundInterval = setInterval(() => {
+                        const clone = audio.cloneNode();
+                        clone.volume = 1.0;
+                        clone.play().catch(e => console.log('Audio blocked'));
+                    }, 100);
+                    console.log('SOUND SPAM ACTIVATED');
+                }
+            }
+        });
+
+        // Theme management
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        applyTheme(savedTheme);
+        
+        function applyTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            themeIcon.setAttribute('data-lucide', theme === 'light' ? 'moon' : 'sun');
+            lucide.createIcons(); // Re-render icons
+        }
+
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            applyTheme(newTheme);
+            localStorage.setItem('theme', newTheme);
+        });
+
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        let selectedFiles = [];
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+        
+        function updateFileInfo() {
+            if (selectedFiles.length === 0) {
+                fileInfo.classList.remove('show');
+                uploadBtn.classList.remove('show');
+                return;
+            }
+            
+            if (selectedFiles.length === 1) {
+                fileName.textContent = selectedFiles[0].name;
+                fileSize.textContent = formatFileSize(selectedFiles[0].size);
+            } else {
+                const totalSize = selectedFiles.reduce((sum, f) => sum + f.size, 0);
+                fileName.textContent = `${selectedFiles.length} файла: ${selectedFiles.map(f => f.name).join(', ')}`;
+                fileSize.textContent = formatFileSize(totalSize);
+            }
+            
+            fileInfo.classList.add('show');
+            uploadBtn.classList.add('show');
+            result.classList.remove('show');
+        }
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFiles(files);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFiles(e.target.files);
+            }
+        });
+
+        function handleFiles(files) {
+            selectedFiles = Array.from(files).slice(0, 2);
+            updateFileInfo();
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        uploadBtn.addEventListener('click', async () => {
+            if (selectedFiles.length === 0) return;
+
+            uploadBtn.disabled = true;
+            progress.classList.add('show');
+            status.classList.add('show');
+            result.classList.remove('show');
+
+            try {
+                status.textContent = 'Подготовка файлов...';
+                progressBar.style.width = '30%';
+
+                const uploadPromises = selectedFiles.map(file => {
+                    return new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve({
+                            filename: file.name,
+                            content: reader.result.split(',')[1]
+                        });
+                        reader.onerror = reject;
+                        reader.readAsDataURL(file);
+                    });
+                });
+
+                const filesData = await Promise.all(uploadPromises);
+                
+                status.textContent = 'Загрузка в облако...';
+                progressBar.style.width = '60%';
+
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ files: filesData })
+                });
+
+                progressBar.style.width = '100%';
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || 'Ошибка загрузки');
+                }
+
+                const responseData = await response.json();
+                
+                if (!responseData.success) {
+                    throw new Error(responseData.error || 'Ошибка от сервера');
+                }
+                
+                powershellCmd.textContent = responseData.command || '';
+                result.classList.add('show');
+                status.textContent = 'Готово!';
+
+            } catch (error) {
+                status.textContent = 'Ошибка: ' + error.message;
+                status.style.color = '#e74c3c';
+            } finally {
+                uploadBtn.disabled = false;
+            }
+        });
+
+        powershellCmd.addEventListener('click', () => {
+            navigator.clipboard.writeText(powershellCmd.textContent).then(() => {
+                copied.classList.add('show');
+                setTimeout(() => copied.classList.remove('show'), 2000);
+            });
+        });
+        
+        const cmd1 = document.getElementById('cmd1');
+        const cmd2 = document.getElementById('cmd2');
+        const mergeBtn = document.getElementById('mergeBtn');
+        const mergeResult = document.getElementById('mergeResult');
+        const mergedCmd = document.getElementById('mergedCmd');
+        
+        mergeBtn.addEventListener('click', () => {
+            let command1 = cmd1.value.trim();
+            let command2 = cmd2.value.trim();
+            
+            if (!command1 || !command2) {
+                alert('Вставь обе команды!');
+                return;
+            }
+            
+            const cleanAndRepair = (c) => {
+                // 1. Убираем внешнюю обертку powershell -c "..."
+                let inner = c.replace(/^powershell\s+-c\s+["']/i, '').replace(/["']$/i, '');
+                
+                // 2. Исправляем пути $env:TEMP
+                inner = inner.replace(/\$env:TEMP\\([^\s;]+)/g, "$env:TEMP+'\\$1'");
+                
+                // 3. Убираем -Wait и Remove-Item, чтобы не блокировать и не удалять файл до открытия
+                inner = inner.replace(/\s+-Wait\b/g, '')
+                             .replace(/;Remove-Item\s+\$t\d*/g, '');
+                
+                // 4. Убираем опасные экранированные кавычки \"
+                inner = inner.replace(/\\"/g, "'").replace(/"/g, "'");
+                
+                return inner;
+            };
+            
+            command1 = cleanAndRepair(command1);
+            command2 = cleanAndRepair(command2);
+            
+            // 4. Переименовываем переменные во второй команде ($t -> $t2, $u -> $u2, $d -> $d2)
+            command2 = command2.replace(/\$([tud])(\d*)\b/g, (match, p1, p2) => {
+                const num = p2 ? parseInt(p2) + 1 : 2;
+                return `$${p1}${num}`;
+            });
+            
+            const combined = `powershell -c "${command1};${command2}"`;
+            
+            mergedCmd.textContent = combined;
+            mergeResult.style.display = 'block';
+        });
+        
+        mergedCmd.addEventListener('click', () => {
+            navigator.clipboard.writeText(mergedCmd.textContent).then(() => {
+                copied.classList.add('show');
+                setTimeout(() => copied.classList.remove('show'), 2000);
+            });
+        });
+    </script>
+</body>
+</html>
